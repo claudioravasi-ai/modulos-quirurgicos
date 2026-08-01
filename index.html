@@ -520,13 +520,17 @@ body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bot
             <button class="btn btn-ghost btn-sm" id="btnPrintRecibo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><path d="M6 14h12v7H6z"/></svg> Imprimir recibo</button>
             <button class="btn btn-ghost btn-sm" id="btnExportRecibo">Recibo a Excel</button>
             <div class="grow"></div>
-            <button class="btn btn-ghost btn-sm" id="btnPrintComp">Imprimir comparativo</button>
-            <div class="seg" style="width:auto"><button id="cmMod" class="on">Módulos</button><button id="cmImp">Importes</button></div>
+            <span class="mini" id="liqNota"></span>
           </div>
         </div>
         <div class="card recibo-card" style="margin-bottom:14px"><div class="recibo" id="reciboBox"></div></div>
         <div class="card comparativo-card">
-          <div class="card-h"><h3>Comparativo mes a mes por profesional</h3><span class="hint" id="compHint"></span></div>
+          <div class="card-h"><h3>Comparativo mes a mes por profesional</h3><span class="hint" id="compHint"></span>
+            <div class="grow"></div>
+            <span class="mini" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:10px">Ver en</span>
+            <div class="seg" style="width:auto"><button id="cmMod" class="on">Módulos</button><button id="cmImp">Importes</button></div>
+            <button class="btn btn-ghost btn-sm" id="btnPrintComp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2"/><path d="M6 14h12v7H6z"/></svg> Imprimir</button>
+          </div>
           <div class="tbl-wrap" id="compTable"></div>
         </div>
       </section>
@@ -2055,7 +2059,10 @@ function renderComparativo() {
   const idx = meses.indexOf(state.mes);
   const vent = meses.slice(Math.max(0, (idx < 0 ? meses.length : idx + 1) - 12), (idx < 0 ? meses.length : idx + 1));
   const modo = state.compMode;
-  $('#compHint').textContent = `${vent.length} período(s) · ${modo === 'mod' ? 'módulos totales' : 'importe estimado'}`;
+  $('#compHint').textContent = vent.length === 1
+    ? `un solo período cargado · ${modo === 'mod' ? 'módulos totales' : 'importe estimado'}`
+    : `últimos ${vent.length} períodos · ${modo === 'mod' ? 'módulos totales' : 'importe estimado'}`;
+  if ($('#liqNota')) $('#liqNota').textContent = 'El comparativo mensual está más abajo';
   if (!vent.length) { $('#compTable').innerHTML = emptyBox('Sin períodos cargados'); return; }
 
   const datos = {};
@@ -2071,7 +2078,7 @@ function renderComparativo() {
 
   const rows = activos.map(p => {
     const serie = vent.map(ym => val(datos[p.id][ym]));
-    const ult = serie[serie.length - 1], ant = serie.length > 1 ? serie[serie.length - 2] : 0;
+    const ult = serie[serie.length - 1], hayPrevio = serie.length > 1, ant = hayPrevio ? serie[serie.length - 2] : 0;
     const dif = ant ? pct(ult - ant, ant) : (ult ? 100 : 0);
     const mx = maxRow(p.id);
     return `<tr>
@@ -2080,7 +2087,7 @@ function renderComparativo() {
         return `<td class="mcell" style="${ym === state.mes ? 'background:var(--teal-soft);font-weight:800' : ''}${!v ? 'color:var(--txt-3)' : ''}"
           title="${m ? `A ${m.A} · B ${m.B} · C ${m.C}` : 'sin actividad'}">${fmt(v)}</td>`; }).join('')}
       <td class="num" style="font-weight:700">${fmt(serie.reduce((a, b) => a + b, 0))}</td>
-      <td class="center">${ant || ult ? `<span class="trend ${dif > 0 ? 'up' : dif < 0 ? 'dn' : 'eq'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${Math.abs(dif).toFixed(0)}%</span>` : ''}</td>
+      <td class="center">${hayPrevio && (ant || ult) ? `<span class="trend ${dif > 0 ? 'up' : dif < 0 ? 'dn' : 'eq'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${Math.abs(dif).toFixed(0)}%</span>` : '<span class="pct">—</span>'}</td>
       <td style="width:110px"><div class="spark">${serie.map((v, i) => `<i class="${vent[i] === state.mes ? 'cur' : ''}" style="height:${Math.max(6, v / mx * 100)}%"></i>`).join('')}</div></td></tr>`;
   }).join('');
 
@@ -2091,7 +2098,9 @@ function renderComparativo() {
     <tbody>${rows}</tbody>
     <tfoot><tr class="t-foot"><td>TOTAL SERVICIO</td>
       ${vent.map(ym => `<td class="center">${fmt(totalMes[ym])}</td>`).join('')}
-      <td class="num">${fmt(Object.values(totalMes).reduce((a, b) => a + b, 0))}</td><td colspan="2"></td></tr></tfoot></table>`;
+      <td class="num">${fmt(Object.values(totalMes).reduce((a, b) => a + b, 0))}</td><td colspan="2"></td></tr></tfoot></table>
+    ${vent.length === 1 ? `<div style="padding:12px 16px;font-size:12px;color:var(--txt-3);border-top:1px solid var(--line-2)">
+      Por ahora hay un único período cargado, así que el cuadro muestra una columna. A medida que registres los meses siguientes se agregan columnas y aparece la variación de cada profesional respecto del mes anterior.</div>` : ''}`;
 }
 
 function exportRecibo() {
